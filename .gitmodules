@@ -1,0 +1,3 @@
+[submodule "external/bace"]
+	path = external/bace
+	url = s:/bace

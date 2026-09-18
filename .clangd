@@ -1,0 +1,9 @@
+CompileFlags:
+  Add: [
+    "-xc",
+    "-Wall",
+    "-Wextra",
+    "-Wpedantic",
+    "-Wconversion",
+    "-Wno-initializer-overrides",
+  ]

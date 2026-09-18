@@ -1,0 +1,5 @@
+IndentWidth: 2
+OneLineFormatOffRegex: "cf-off"
+AllowShortFunctionsOnASingleLine: false
+AllowShortLoopsOnASingleLine: true
+SortIncludes: Never
