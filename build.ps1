@@ -65,6 +65,7 @@ $CompFlags = @(
     "/WX"
     "/Od"
     "/std:c11"
+    "/experimental:c11atomics"
     "/nologo"
 )
 

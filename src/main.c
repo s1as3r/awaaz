@@ -1,13 +1,13 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <bace/bace.h>
 
-#include <initguid.h>
 #include "audio_engine.h"
 #include "audio_engine.c"
-
-#define trace_log(...) fprintf(stderr, __VA_ARGS__)
+#include "ring_buffer.c"
 
 int main(int argc, char **argv) {
   bace_os_state_init();
@@ -24,6 +24,47 @@ int main(int argc, char **argv) {
            devices.devices[i].name.str);
   }
 
+  // test code
+  // TODO: imgui ftw
+  printf("\ninput: ");
+  u32 input_idx;
+  scanf("%u", &input_idx);
+
+  printf("n outputs: ");
+  u32 n_out;
+  scanf("%u", &n_out);
+
+  u32 *outputs = push_array_no_zero(prog_arena, u32, n_out);
+  Str8 *output_ids = push_array_no_zero(prog_arena, Str8, n_out);
+  for (u32 i = 0; i < n_out; i += 1) {
+    printf("%u: ", i);
+    scanf("%u", &outputs[i]);
+    output_ids[i] = devices.devices[outputs[i]].id;
+  }
+
+  printf("input = %s\n", devices.devices[input_idx].name.str);
+  printf("outputs = ");
+  for (u32 i = 0; i < n_out; i += 1) {
+    printf("%s", devices.devices[outputs[i]].name.str);
+    if (i != n_out - 1) {
+      printf(", ");
+    } else {
+      printf("\n");
+    }
+  }
+
+  Arena *a1 = arena_alloc();
+  Arena *a2 = arena_alloc();
+  ae_start(a1, a2, devices.devices[input_idx].id, output_ids, n_out);
+
+  printf("ae started\n");
+  i32 stop;
+  scanf("%d", &stop);
+
+  ae_stop();
+  arena_release(a1);
+  arena_release(a2);
   arena_release(prog_arena);
+
   return EXIT_SUCCESS;
 }
