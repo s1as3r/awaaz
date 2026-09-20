@@ -96,7 +96,6 @@ $CompFlags = @(
     "/I$BacePath\include"
     "/I$CimguiPath\cimgui"
     "/I$SDLPath\include"
-    "/I"
     "/W4"
     "/WX"
     "/Od"
