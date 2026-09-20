@@ -1,0 +1,53 @@
+name: build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_NAME: ${{ github.event.repository.name }}
+  PROJECT_RELEASE_PATH: ${{ github.event.repository.name }}
+
+jobs:
+  build:
+    permissions:
+      contents: write
+
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout this repo with submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup Environment
+      run: |
+        New-Item -ItemType Directory -Force -Path ${{ env.PROJECT_RELEASE_PATH }}
+        ls
+
+    - name: Setup MSVC
+      run: |
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        $vsPath = & $vswhere -latest -products * -property installationPath
+        if (-not $vsPath) { throw "Could not find a Visual Studio installation" }
+        "VS=$vsPath"
+        "VS=$vsPath" >> $env:GITHUB_ENV
+
+    - name: Build awaaz
+      run: |
+        ./build.ps1
+
+    - name: Generate Artifacts
+      run: |
+        ls build/
+        cp build/awaaz.exe ${{ env.PROJECT_RELEASE_PATH }}/awaaz.exe
+        ls ${{ env.PROJECT_RELEASE_PATH }}/
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.PROJECT_RELEASE_PATH }}
+        path: ${{ env.PROJECT_RELEASE_PATH }}/
