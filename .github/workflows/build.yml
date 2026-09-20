@@ -28,17 +28,9 @@ jobs:
         New-Item -ItemType Directory -Force -Path ${{ env.PROJECT_RELEASE_PATH }}
         ls
 
-    - name: Setup MSVC
-      run: |
-        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-        $vsPath = & $vswhere -latest -products * -property installationPath
-        if (-not $vsPath) { throw "Could not find a Visual Studio installation" }
-        "VS=$vsPath"
-        "VS=$vsPath" >> $env:GITHUB_ENV
-
     - name: Build awaaz
       run: |
-        ./build.ps1
+        & "C:\Program Files\Microsoft Visual Studio\18\Enterprise\Common7\Tools\Launch-VsDevShell.ps1" && ./build.ps1
 
     - name: Generate Artifacts
       run: |
