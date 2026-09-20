@@ -93,10 +93,11 @@ void draw_ui(AppState *state) {
   igSeparator();
 
   igText("Outputs: ");
-  igBeginChild_Str("outputs", (ImVec2){0, 180},
-                   ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeX |
+  igBeginChild_Str("outputs", (ImVec2){0.0f, 300.0f},
+                   ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysAutoResize |
+                       ImGuiChildFlags_AutoResizeX |
                        ImGuiChildFlags_AutoResizeY,
-                   0);
+                   ImGuiWindowFlags_None);
   {
     for (i32 i = 0; i < (i32)state->devices.count; i += 1) {
       if (i == state->capture_idx) {
@@ -153,6 +154,26 @@ void draw_ui(AppState *state) {
   if (state->err[0]) {
     igSpacing();
     igTextColored((ImVec4){1.0f, 0.4f, 0.4f, 1.0f}, "%s", state->err);
+  }
+
+  if (0) {
+    igSpacing();
+    igSeparator();
+    igBeginChild_Str("stats", (ImVec2){0, 180},
+                     ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeX |
+                         ImGuiChildFlags_AutoResizeY,
+                     0);
+    {
+      igText("outputs arena: pos = %u | cmt = %u | res = %u",
+             state->outputs_arena->pos, state->outputs_arena->cmt,
+             state->outputs_arena->res);
+      igText("capture arena: pos = %u | cmt = %u | res = %u",
+             state->capture_arena->pos, state->capture_arena->cmt,
+             state->capture_arena->res);
+      igText("ui arena: pos = %u | cmt = %u | res = %u", state->ui_arena->pos,
+             state->ui_arena->cmt, state->ui_arena->res);
+    }
+    igEndChild();
   }
 
   igEnd();
