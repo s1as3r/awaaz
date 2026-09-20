@@ -30,7 +30,7 @@ jobs:
 
     - name: Build awaaz
       run: |
-        & "C:\Program Files\Microsoft Visual Studio\18\Enterprise\Common7\Tools\Launch-VsDevShell.ps1 -Arch amd64" && ./build.ps1
+        & "C:\Program Files\Microsoft Visual Studio\18\Enterprise\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 && ./build.ps1
 
     - name: Generate Artifacts
       run: |
