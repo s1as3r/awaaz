@@ -102,6 +102,7 @@ $CompFlags = @(
     "/std:c11"
     "/experimental:c11atomics"
     "/nologo"
+    "/Wv:18"
 )
 
 # build commands
