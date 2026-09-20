@@ -1,3 +1,5 @@
+imgui.ini
+raddbg.proj
 build/
 *.raddbg
 
