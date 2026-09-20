@@ -1,3 +1,9 @@
 [submodule "external/bace"]
 	path = external/bace
 	url = s:/bace
+[submodule "external/SDL"]
+	path = external/SDL
+	url = https://github.com/libsdl-org/SDL
+[submodule "external/cimgui/cimgui"]
+	path = external/cimgui/cimgui
+	url = https://github.com/cimgui/cimgui

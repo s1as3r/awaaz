@@ -1,13 +1,21 @@
-#define _CRT_SECURE_NO_WARNINGS
+#define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
+#define CIMGUI_USE_SDL3
+#include <cimgui.h>
+#include <cimgui_impl.h>
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <SDL3/SDL.h>
 
 #include <bace/bace.h>
 
 #include "audio_engine.h"
 #include "audio_engine.c"
 #include "ring_buffer.c"
+
+bool ImGui_ImplSDLRenderer3_Init(SDL_Renderer *renderer);
+void ImGui_ImplSDLRenderer3_NewFrame(void);
+void ImGui_ImplSDLRenderer3_RenderDrawData(ImDrawData *draw_data,
+                                           SDL_Renderer *renderer);
+void ImGui_ImplSDLRenderer3_Shutdown(void);
 
 int main(int argc, char **argv) {
   bace_os_state_init();
@@ -17,54 +25,94 @@ int main(int argc, char **argv) {
   trace_log("[info] argc = %d | argv[0] = %s\n", argc, argv[0]);
   trace_log("[info] base path = %s\n", base_path.str);
 
+  if (!SDL_Init(SDL_INIT_VIDEO)) {
+    trace_log("[error] failed to init sdl: %s\n", SDL_GetError());
+    return EXIT_FAILURE;
+  }
+
+  f32 main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+  SDL_WindowFlags window_flags =
+      SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+  SDL_Window *window = NULL;
+  SDL_Renderer *renderer = NULL;
+
+  i32 width = 800;
+  i32 height = 600;
+  if (!SDL_CreateWindowAndRenderer("awaaz", width, height, window_flags,
+                                   &window, &renderer)) {
+    trace_log("[error] failed to create window + renderer: %s\n",
+              SDL_GetError());
+    return EXIT_FAILURE;
+  }
+
+  SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+  SDL_ShowWindow(window);
+
+  igCreateContext(NULL);
+  ImGuiIO *io = igGetIO_Nil();
+  io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+  igStyleColorsDark(NULL);
+
+  ImGuiStyle *style = igGetStyle();
+  ImGuiStyle_ScaleAllSizes(style, main_scale);
+  style->FontScaleDpi = main_scale;
+  io->ConfigDpiScaleFonts = true;
+  io->ConfigDpiScaleViewports = true;
+
+  ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
+  ImGui_ImplSDLRenderer3_Init(renderer);
+
   AeDeviceList devices = ae_enumerate_render_devices(prog_arena);
 
-  for (u32 i = 0; i < devices.count; i += 1) {
-    printf("[%u] %s: %s\n", i, devices.devices[i].id.str,
-           devices.devices[i].name.str);
-  }
+  ImVec4 clear_color = {0.45f, 0.55f, 0.60f, 1.00f};
 
-  // test code
-  // TODO: imgui ftw
-  printf("\ninput: ");
-  u32 input_idx;
-  scanf("%u", &input_idx);
-
-  printf("n outputs: ");
-  u32 n_out;
-  scanf("%u", &n_out);
-
-  u32 *outputs = push_array_no_zero(prog_arena, u32, n_out);
-  Str8 *output_ids = push_array_no_zero(prog_arena, Str8, n_out);
-  for (u32 i = 0; i < n_out; i += 1) {
-    printf("%u: ", i);
-    scanf("%u", &outputs[i]);
-    output_ids[i] = devices.devices[outputs[i]].id;
-  }
-
-  printf("input = %s\n", devices.devices[input_idx].name.str);
-  printf("outputs = ");
-  for (u32 i = 0; i < n_out; i += 1) {
-    printf("%s", devices.devices[outputs[i]].name.str);
-    if (i != n_out - 1) {
-      printf(", ");
-    } else {
-      printf("\n");
+  bool running = true;
+  while (running) {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+      ImGui_ImplSDL3_ProcessEvent(&event);
+      if (event.type == SDL_EVENT_QUIT) {
+        running = false;
+      }
+      if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
+          event.window.windowID == SDL_GetWindowID(window)) {
+        running = false;
+      }
     }
+
+    if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) {
+      SDL_Delay(10);
+      continue;
+    }
+
+    SDL_SetRenderDrawColorFloat(renderer, clear_color.x, clear_color.y,
+                                clear_color.z, clear_color.w);
+    SDL_RenderClear(renderer);
+    ImGui_ImplSDLRenderer3_NewFrame();
+    ImGui_ImplSDL3_NewFrame();
+    igNewFrame();
+
+    igBegin("devices", NULL, ImGuiWindowFlags_AlwaysAutoResize);
+    for (u32 i = 0; i < devices.count; i += 1) {
+      igBulletText("%s", devices.devices[i].name.str);
+    }
+    igEnd();
+
+    igRender();
+    ImDrawData *draw_data = igGetDrawData();
+    ImGui_ImplSDLRenderer3_RenderDrawData(draw_data, renderer);
+    SDL_RenderPresent(renderer);
   }
 
-  Arena *a1 = arena_alloc();
-  Arena *a2 = arena_alloc();
-  ae_start(a1, a2, devices.devices[input_idx].id, output_ids, n_out);
+  ImGui_ImplSDL3_Shutdown();
+  ImGui_ImplSDLRenderer3_Shutdown();
+  igDestroyContext(NULL);
 
-  printf("ae started\n");
-  i32 stop;
-  scanf("%d", &stop);
+  SDL_DestroyRenderer(renderer);
+  SDL_DestroyWindow(window);
+  SDL_Quit();
 
-  ae_stop();
-  arena_release(a1);
-  arena_release(a2);
   arena_release(prog_arena);
-
   return EXIT_SUCCESS;
 }

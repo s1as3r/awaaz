@@ -235,7 +235,7 @@ internal int output_thread_proc(void *param) {
       for (u32 c = 0; c < n_in_ch && c < 8; c += 1) {
         f32 a = scratch_frames[(u32)idx * n_in_ch + c];
         f32 b = scratch_frames[((u32)idx + 1) * n_in_ch + c];
-        mixed[c] = (f32)(a + (b - a) * frac);
+        mixed[c] = (f32)lerp_f64(a, b, frac);
       }
       convert_channels(mixed, n_in_ch, &out[i * n_out_ch], n_out_ch);
       pos += ratio;
