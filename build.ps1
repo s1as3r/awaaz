@@ -110,6 +110,8 @@ $ExeArgs = $Defines + $Debug + $CompFlags + @(
     "$Src\main.c"
     "/link"
     "/incremental:no"
+    "/subsystem:windows"
+    "/entry:mainCRTStartup"
 ) + $Libs
 
 $NoBuildDeps = $false
