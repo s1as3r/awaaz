@@ -11,20 +11,155 @@
 #include "audio_engine.c"
 #include "ring_buffer.c"
 
+#define AE_MAX_ERR_SZ 256
+
 bool ImGui_ImplSDLRenderer3_Init(SDL_Renderer *renderer);
 void ImGui_ImplSDLRenderer3_NewFrame(void);
 void ImGui_ImplSDLRenderer3_RenderDrawData(ImDrawData *draw_data,
                                            SDL_Renderer *renderer);
 void ImGui_ImplSDLRenderer3_Shutdown(void);
 
-int main(int argc, char **argv) {
-  bace_os_state_init();
-  Arena *prog_arena = arena_alloc();
-  Str8 base_path =
-      str8_copy(prog_arena, str8_chop_last_slash(str8_cstring(argv[0])));
-  trace_log("[info] argc = %d | argv[0] = %s\n", argc, argv[0]);
-  trace_log("[info] base path = %s\n", base_path.str);
+global const ImVec2 g_zero_vec2 = {0.0f, 0.0f};
 
+typedef struct {
+  Arena *capture_arena;
+  Arena *outputs_arena;
+  Arena *ui_arena;
+
+  AeDeviceList devices;
+  i32 capture_idx;
+  bool *selected_outputs;
+
+  char err[AE_MAX_ERR_SZ];
+} AppState;
+
+void refresh_devices(AppState *state) {
+  arena_pop_to(state->ui_arena, 0);
+  state->devices = ae_enumerate_render_devices(state->ui_arena);
+  if (state->capture_idx >= (i32)state->devices.count) {
+    state->capture_idx = -1;
+  }
+
+  state->selected_outputs =
+      push_array_no_zero(state->ui_arena, bool, state->devices.count);
+  for (u32 i = 0; i < state->devices.count; i += 1) {
+    state->selected_outputs[i] = false;
+  }
+}
+
+void draw_ui(AppState *state) {
+  const ImGuiViewport *viewport = igGetMainViewport();
+  igSetNextWindowPos(viewport->WorkPos, ImGuiCond_None, g_zero_vec2);
+  igSetNextWindowSize(viewport->WorkSize, ImGuiCond_None);
+
+  ImGuiWindowFlags window_flags =
+      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+      ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+      ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+
+  igPushStyleVar_Float(ImGuiStyleVar_WindowRounding, 0.0f);
+  igPushStyleVar_Float(ImGuiStyleVar_WindowBorderSize, 0.0f);
+
+  igBegin("awaaz", NULL, window_flags);
+  igPopStyleVar(2);
+  igText("audio output to multiple devices");
+  igSeparator();
+
+  if (igButton("Refresh Devices", g_zero_vec2)) {
+    refresh_devices(state);
+  }
+  igSpacing();
+
+  igText("Capture Source:");
+  const char *preview =
+      (state->capture_idx >= 0)
+          ? (char *)state->devices.devices[state->capture_idx].name.str
+          : "(choose one)";
+
+  if (igBeginCombo("##capture", preview, ImGuiComboFlags_None)) {
+    for (i32 i = 0; i < (i32)state->devices.count; i += 1) {
+      bool selected = (i == state->capture_idx);
+      if (igSelectable_Bool((char *)state->devices.devices[i].name.str,
+                            selected, 0, g_zero_vec2)) {
+        state->capture_idx = i;
+      }
+      if (selected) {
+        igSetItemDefaultFocus();
+      }
+    }
+    igEndCombo();
+  }
+  igSpacing();
+  igSeparator();
+
+  igText("Outputs: ");
+  igBeginChild_Str("outputs", (ImVec2){0, 180},
+                   ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeX |
+                       ImGuiChildFlags_AutoResizeY,
+                   0);
+  {
+    for (i32 i = 0; i < (i32)state->devices.count; i += 1) {
+      if (i == state->capture_idx) {
+        continue;
+      }
+      igCheckbox((char *)state->devices.devices[i].name.str,
+                 &state->selected_outputs[i]);
+    }
+  }
+  igEndChild();
+
+  igSpacing();
+  igSeparator();
+
+  bool running = ae_is_running();
+  if (!running) {
+    if (igButton("Start", g_zero_vec2)) {
+      if (state->capture_idx < 0) {
+        sprintf_s(state->err, AE_MAX_ERR_SZ, "pick a capture device first");
+      } else {
+        Str8 *out_ids = push_array_no_zero(state->outputs_arena, Str8,
+                                           state->devices.count);
+        u32 n = 0;
+        for (u32 i = 0; i < state->devices.count; i += 1) {
+          if (state->selected_outputs[i] && !((i32)i == state->capture_idx)) {
+            out_ids[n++] = state->devices.devices[i].id;
+          }
+        }
+        if (n == 0) {
+          sprintf_s(state->err, AE_MAX_ERR_SZ,
+                    "select at least one output device");
+        } else {
+          state->err[0] = 0;
+          ae_start(state->capture_arena, state->outputs_arena,
+                   state->devices.devices[state->capture_idx].id, out_ids, n);
+        }
+      }
+    }
+  } else {
+    if (igButton("Stop", g_zero_vec2)) {
+      ae_stop();
+      arena_pop_to(state->capture_arena, 0);
+      arena_pop_to(state->outputs_arena, 0);
+    }
+  }
+
+  if (running) {
+    igSpacing();
+    igText("Level: ");
+    igSameLine(0, 0);
+    igProgressBar(ae_peak_level(), (ImVec2){-1.0f, 0.0f}, NULL);
+  }
+
+  if (state->err[0]) {
+    igSpacing();
+    igTextColored((ImVec4){1.0f, 0.4f, 0.4f, 1.0f}, "%s", state->err);
+  }
+
+  igEnd();
+}
+
+int main(void) {
+  bace_os_state_init();
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     trace_log("[error] failed to init sdl: %s\n", SDL_GetError());
     return EXIT_FAILURE;
@@ -63,10 +198,15 @@ int main(int argc, char **argv) {
   ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
   ImGui_ImplSDLRenderer3_Init(renderer);
 
-  AeDeviceList devices = ae_enumerate_render_devices(prog_arena);
-
   ImVec4 clear_color = {0.45f, 0.55f, 0.60f, 1.00f};
 
+  AppState app_state = {
+      .capture_arena = arena_alloc(),
+      .outputs_arena = arena_alloc(),
+      .ui_arena = arena_alloc(),
+      .capture_idx = -1,
+  };
+  refresh_devices(&app_state);
   bool running = true;
   while (running) {
     SDL_Event event;
@@ -92,12 +232,7 @@ int main(int argc, char **argv) {
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     igNewFrame();
-
-    igBegin("devices", NULL, ImGuiWindowFlags_AlwaysAutoResize);
-    for (u32 i = 0; i < devices.count; i += 1) {
-      igBulletText("%s", devices.devices[i].name.str);
-    }
-    igEnd();
+    draw_ui(&app_state);
 
     igRender();
     ImDrawData *draw_data = igGetDrawData();
@@ -113,6 +248,8 @@ int main(int argc, char **argv) {
   SDL_DestroyWindow(window);
   SDL_Quit();
 
-  arena_release(prog_arena);
+  arena_release(app_state.capture_arena);
+  arena_release(app_state.outputs_arena);
+  arena_release(app_state.ui_arena);
   return EXIT_SUCCESS;
 }

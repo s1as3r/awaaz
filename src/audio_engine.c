@@ -509,3 +509,9 @@ bool ae_start(Arena *cap_arena, Arena *outputs_arena, Str8 capture_device_id,
   atomic_store(&g_running, 1);
   return true;
 }
+
+f32 ae_peak_level(void) {
+  f32 p = g_peak;
+  g_peak *= 0.90f;
+  return p;
+}
