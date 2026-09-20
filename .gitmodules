@@ -1,6 +1,6 @@
 [submodule "external/bace"]
 	path = external/bace
-	url = s:/bace
+	url = https://github.com/s1as3r/bace
 [submodule "external/SDL"]
 	path = external/SDL
 	url = https://github.com/libsdl-org/SDL
