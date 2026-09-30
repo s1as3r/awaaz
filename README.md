@@ -2,7 +2,7 @@
 
 - [x] gui
 - [ ] perf
-- [ ] linux?
+- [x] linux?
 
 ## Build
 - Clone the repo (with submodules):

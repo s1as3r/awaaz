@@ -2,9 +2,12 @@
 #define _H_AWAAZ_AUDIO_ENGINE
 
 #include <bace/bace.h>
-#include <stdio.h>
+#include <stdio.h> // IWYU pragma: export
 
 #define trace_log(...) fprintf(stderr, __VA_ARGS__)
+
+#define AE_BUFFER_TIME_MS 10
+#define AE_WAIT_TIMEOUT_MS (AE_BUFFER_TIME_MS * 3)
 
 typedef struct {
   Str8 id;   // endpoint id string used to open the device.

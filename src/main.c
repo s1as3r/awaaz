@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <stdlib.h>
+
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #define CIMGUI_USE_SDL3
 #include <cimgui.h>
@@ -8,7 +11,12 @@
 #include <bace/bace.h>
 
 #include "audio_engine.h"
-#include "audio_engine.c"
+
+#if OS_WINDOWS
+#include "w32_audio_engine.c"
+#elif OS_LINUX
+#include "lnx_audio_engine.c"
+#endif
 #include "ring_buffer.c"
 
 #define AE_MAX_ERR_SZ 256
@@ -116,7 +124,7 @@ void draw_ui(AppState *state) {
   if (!running) {
     if (igButton("Start", g_zero_vec2)) {
       if (state->capture_idx < 0) {
-        sprintf_s(state->err, AE_MAX_ERR_SZ, "pick a capture device first");
+        snprintf(state->err, AE_MAX_ERR_SZ, "pick a capture device first");
       } else {
         Str8 *out_ids = push_array_no_zero(state->outputs_arena, Str8,
                                            state->devices.count);
@@ -127,8 +135,8 @@ void draw_ui(AppState *state) {
           }
         }
         if (n == 0) {
-          sprintf_s(state->err, AE_MAX_ERR_SZ,
-                    "select at least one output device");
+          snprintf(state->err, AE_MAX_ERR_SZ,
+                   "select at least one output device");
         } else {
           state->err[0] = 0;
           ae_start(state->capture_arena, state->outputs_arena,
