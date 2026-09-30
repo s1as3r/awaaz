@@ -63,8 +63,9 @@ internal void pa_count_cb(pa_context *c, const pa_sink_info *i, int eol,
     state->is_done = true;
     return;
   }
-  if (i)
+  if (i) {
     state->count += 1;
+  }
 }
 
 typedef struct {
@@ -95,15 +96,15 @@ internal void pa_populate_cb(pa_context *c, const pa_sink_info *i, int eol,
 internal void pa_state_cb(pa_context *c, void *userdata) {
   i32 *status = (i32 *)userdata;
   switch (pa_context_get_state(c)) {
-  case PA_CONTEXT_READY:
+  case PA_CONTEXT_READY: {
     *status = 1;
-    break;
+  } break;
   case PA_CONTEXT_FAILED:
-  case PA_CONTEXT_TERMINATED:
+  case PA_CONTEXT_TERMINATED: {
     *status = -1;
-    break;
-  default:
-    break;
+  } break;
+  default: {
+  } break;
   }
 }
 
