@@ -197,7 +197,7 @@ internal int output_thread_proc(void *param) {
   IAudioClient_Start(oc->client);
 
   while (!atomic_load(&oc->stop_flag)) {
-    if (WaitForSingleObject(oc->event, 200) != WAIT_OBJECT_0) {
+    if (WaitForSingleObject(oc->event, AE_WAIT_TIMEOUT_MS) != WAIT_OBJECT_0) {
       continue;
     }
 
@@ -259,7 +259,7 @@ internal int capture_thread_proc(void *param) {
   IAudioClient_Start(g_capture_ctx.client);
 
   while (!atomic_load(&g_capture_ctx.stop_flag)) {
-    if (WaitForSingleObject(g_capture_ctx.event, 200) != WAIT_OBJECT_0) {
+    if (WaitForSingleObject(g_capture_ctx.event, AE_WAIT_TIMEOUT_MS) != WAIT_OBJECT_0) {
       continue;
     }
 
@@ -427,7 +427,7 @@ bool ae_start(Arena *cap_arena, Arena *outputs_arena, Str8 capture_device_id,
   hr = IAudioClient_Initialize(g_capture_ctx.client, AUDCLNT_SHAREMODE_SHARED,
                                AUDCLNT_STREAMFLAGS_LOOPBACK |
                                    AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-                               200 * 10000, // 200 ms buffer, in 100ns units
+                               AE_BUFFER_TIME_MS * 10000, // in 100ns units
                                0, g_capture_ctx.format, NULL);
   if (FAILED(hr)) {
     trace_log("[error] initialize(capture) failed: 0x%07lx", hr);
@@ -460,9 +460,9 @@ bool ae_start(Arena *cap_arena, Arena *outputs_arena, Str8 capture_device_id,
 
     IAudioClient_GetMixFormat(oc->client, &oc->format);
 
-    hr = IAudioClient_Initialize(oc->client, AUDCLNT_SHAREMODE_SHARED,
-                                 AUDCLNT_STREAMFLAGS_EVENTCALLBACK, 200 * 10000,
-                                 0, oc->format, NULL);
+    hr = IAudioClient_Initialize(
+        oc->client, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+        AE_BUFFER_TIME_MS * 10000, 0, oc->format, NULL);
     if (FAILED(hr)) {
       free_output(oc);
       continue;
