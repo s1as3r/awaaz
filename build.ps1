@@ -76,8 +76,8 @@ $Defines = @()
 # windows platform libraries
 $Libs = @(
     "/LIBPATH:$BuildPath"
-    "/LIBPATH:$BuildPath\cimgui\cimgui\Debug"
-    "/LIBPATH:$BuildPath\sdl\Debug"
+    "/LIBPATH:$BuildPath\cimgui\cimgui\"
+    "/LIBPATH:$BuildPath\sdl\"
     "$BaceObj"
     "$UuidObj"
     "SDL3-static.lib"
