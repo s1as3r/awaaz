@@ -8,8 +8,8 @@
 
 #include <bace/bace.h>
 
-#include "audio_engine.h"
-#include "ring_buffer.h"
+#include "../audio_engine.h"
+#include "../ring_buffer.h"
 
 #define AE_SAMPLE_RATE 48000
 #define AE_CHANNELS 2

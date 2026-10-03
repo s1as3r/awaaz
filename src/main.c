@@ -13,9 +13,9 @@
 #include "audio_engine.h"
 
 #if OS_WINDOWS
-#include "w32_audio_engine.c"
+#include "win32/audio_engine.c"
 #elif OS_LINUX
-#include "lnx_audio_engine.c"
+#include "linux/audio_engine.c"
 #endif
 #include "ring_buffer.c"
 

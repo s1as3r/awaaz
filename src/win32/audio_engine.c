@@ -11,8 +11,8 @@
 #include <string.h>
 #include <bace/bace.h>
 
-#include "audio_engine.h"
-#include "ring_buffer.h"
+#include "../audio_engine.h"
+#include "../ring_buffer.h"
 
 // per-output state
 typedef struct {

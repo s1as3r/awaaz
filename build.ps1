@@ -124,7 +124,7 @@ foreach ($arg in $args) {
 
 function Build-Uuid {
     Write-Host "== building uuid =="
-    & $CC /nologo /c "$Src\uuid.cpp" /Fo"$BuildPath\$UuidObj"
+    & $CC /nologo /c "$Src\win32\uuid.cpp" /Fo"$BuildPath\$UuidObj"
     return $LASTEXITCODE -eq 0
 }
 
