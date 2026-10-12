@@ -98,6 +98,7 @@ $CompFlags = @(
     "/I$SDLPath\include"
     "/W4"
     "/WX"
+    "/wd4324"
     "/Od"
     "/std:c11"
     "/experimental:c11atomics"

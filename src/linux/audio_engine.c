@@ -171,11 +171,7 @@ internal int output_thread_proc(void *param) {
   u32 nframes = oc->io_buf_bytes / (AE_CHANNELS * sizeof(f32));
 
   while (!atomic_load(&oc->stop_flag)) {
-    if (oc->rb.available >= nframes) {
-      rb_read(&oc->rb, oc->io_buf, nframes);
-    } else {
-      memset(oc->io_buf, 0, oc->io_buf_bytes);
-    }
+    rb_read(&oc->rb, oc->io_buf, nframes);
 
     int err;
     if (pa_simple_write(oc->pa, oc->io_buf, oc->io_buf_bytes, &err) < 0) {

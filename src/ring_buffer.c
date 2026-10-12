@@ -1,78 +1,101 @@
-#include "ring_buffer.h"
 #include <string.h>
+#include <stdatomic.h>
+
+#include "ring_buffer.h"
 
 void rb_init(Arena *arena, RingBuffer *rb, u32 cap, u32 channels) {
   *rb = (RingBuffer){
       .buf = push_array(arena, f32, cap * channels),
       .capacity_frames = cap,
       .channels = channels,
-      .write_pos = 0,
-      .read_pos = 0,
-      .available = 0,
   };
-  mtx_init(&rb->lock, mtx_plain);
+  atomic_init(&rb->write_idx, 0);
+  atomic_init(&rb->write_reserve, 0);
+  atomic_init(&rb->read_idx, 0);
 }
 
 void rb_free(RingBuffer *rb) {
-  mtx_destroy(&rb->lock);
   rb->buf = NULL;
 }
 
-// drops oldest data on overflow rather than blocking the capture thread
 void rb_write(RingBuffer *rb, const f32 *frames, u32 nframes) {
-  mtx_lock(&rb->lock);
+  u32 cap = rb->capacity_frames;
+  u32 ch = rb->channels;
 
-  if (nframes > rb->capacity_frames) {
-    frames += (nframes - rb->capacity_frames) * rb->channels;
-    nframes = rb->capacity_frames;
+  if (nframes > cap) {
+    frames += (nframes - cap) * ch;
+    nframes = cap;
   }
 
-  u32 frames_to_end = rb->capacity_frames - rb->write_pos;
-  u32 part1_frames = min(nframes, frames_to_end);
-  u32 part2_frames = nframes - part1_frames;
+  u64 w = atomic_load_explicit(&rb->write_idx, memory_order_relaxed);
+  u64 new_w = w + nframes;
 
-  memcpy(&rb->buf[rb->write_pos * rb->channels], frames,
-         part1_frames * rb->channels * sizeof(f32));
+  // announce intent *BEFORE* touching the buffer, so a reader can tell
+  // that slots for frames < new_w - cap are being overwritten.
+  atomic_store_explicit(&rb->write_reserve, new_w, memory_order_relaxed);
+  atomic_thread_fence(memory_order_release);
 
-  if (part2_frames > 0) {
-    memcpy(rb->buf, &frames[part1_frames * rb->channels],
-           part2_frames * rb->channels * sizeof(f32));
+  // copy
+  u32 pos = (u32)(w % cap);
+  u32 part1 = min(nframes, cap - pos);
+  u32 part2 = nframes - part1;
+
+  memcpy(&rb->buf[pos * ch], frames, part1 * ch * sizeof(f32));
+  if (part2 > 0) {
+    memcpy(rb->buf, &frames[part1 * ch], part2 * ch * sizeof(f32));
   }
 
-  rb->write_pos = (rb->write_pos + nframes) % rb->capacity_frames;
-  rb->available += nframes;
-
-  if (rb->available >= rb->capacity_frames) {
-    rb->available = rb->capacity_frames;
-    rb->read_pos = rb->write_pos;
-  }
-
-  mtx_unlock(&rb->lock);
+  // publish
+  atomic_store_explicit(&rb->write_idx, new_w, memory_order_release);
 }
 
-// copies upto `nframes` into `out`
 u32 rb_read(RingBuffer *rb, f32 *out, u32 nframes) {
-  mtx_lock(&rb->lock);
+  u32 cap = rb->capacity_frames;
+  u32 ch = rb->channels;
 
-  u32 n = min(nframes, rb->available);
-  u32 frames_to_end = rb->capacity_frames - rb->read_pos;
+  u64 r = atomic_load_explicit(&rb->read_idx, memory_order_relaxed);
+  u64 w = atomic_load_explicit(&rb->write_idx, memory_order_acquire);
 
-  u32 part1 = min(n, frames_to_end);
-  u32 part2 = n - part1;
-  memcpy(out, &rb->buf[rb->read_pos * rb->channels],
-         part1 * rb->channels * sizeof(f32));
-
-  if (part2 > 0) {
-    memcpy(&out[part1 * rb->channels], rb->buf,
-           part1 * rb->channels * sizeof(f32));
+  // already lapped before we started so skip to oldest surviving frame
+  if (w - r > cap) {
+    r = w - cap;
   }
-  rb->read_pos = (rb->read_pos + n) % rb->capacity_frames;
-  rb->available -= n;
-  mtx_unlock(&rb->lock);
 
-  if (n < nframes) {
-    memset(&out[n * rb->channels], 0,
-           (nframes - n) * rb->channels * sizeof(f32));
+  u32 n = min(nframes, (u32)(w - r));
+  u32 got = 0;
+
+  if (n > 0) {
+    u32 pos = (u32)(r % cap);
+    u32 part1 = min(n, cap - pos);
+    u32 part2 = n - part1;
+
+    memcpy(out, &rb->buf[pos * ch], part1 * ch * sizeof(f32));
+    if (part2 > 0) {
+      memcpy(&out[part1 * ch], rb->buf, part2 * ch * sizeof(f32));
+    }
+
+    // did the writer start overwriting what we copied?
+    atomic_thread_fence(memory_order_acquire);
+    u64 reserve =
+        atomic_load_explicit(&rb->write_reserve, memory_order_relaxed);
+    u64 valid_start = reserve > cap ? reserve - cap : 0;
+
+    u32 bad = 0;
+    if (valid_start > r) {
+      u64 b = valid_start - r;
+      bad = (u32)min(b, (u64)n);
+    }
+
+    got = n - bad;
+    if (bad > 0 && got > 0) {
+      memmove(out, &out[bad * ch], got * ch * sizeof(f32));
+    }
+
+    atomic_store_explicit(&rb->read_idx, r + n, memory_order_relaxed);
   }
-  return n;
+
+  if (got < nframes) {
+    memset(&out[got * ch], 0, (nframes - got) * ch * sizeof(f32));
+  }
+  return got;
 }
