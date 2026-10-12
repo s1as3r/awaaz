@@ -358,11 +358,7 @@ internal void free_capture(CaptureCtx *cc) {
   memset(cc, 0, sizeof(*cc));
 }
 
-void ae_stop(void) {
-  if (!atomic_load(&g_running)) {
-    return;
-  }
-
+internal void ae_teardown(void) {
   atomic_store(&g_capture_ctx.stop_flag, true);
   for (u32 i = 0; i < g_output_count; i += 1) {
     atomic_store(&g_outputs[i].stop_flag, true);
@@ -381,50 +377,56 @@ void ae_stop(void) {
     free_output(&g_outputs[i]);
   }
   g_output_count = 0;
+  g_outputs = NULL;
 
   free_capture(&g_capture_ctx);
   atomic_store(&g_running, false);
+}
+
+void ae_stop(void) {
+  if (atomic_load(&g_running)) {
+    ae_teardown();
+  }
 }
 
 bool ae_is_running(void) {
   return atomic_load(&g_running);
 }
 
+// uses cap_arena / outputs_arena from the enclosing function
+#define AE_FAIL(...)                                                           \
+  (ae_set_error(__VA_ARGS__), ae_teardown(), arena_pop_to(cap_arena, 0),       \
+   arena_pop_to(outputs_arena, 0), false)
+
 bool ae_start(Arena *cap_arena, Arena *outputs_arena, Str8 capture_device_id,
               const Str8 *output_ids, u32 output_count) {
+  g_ae_error[0] = 0;
   if (ae_is_running()) {
-    ae_stop();
-    arena_pop_to(cap_arena, 0);
-    arena_pop_to(outputs_arena, 0);
+    ae_set_error("already running");
+    return false;
   }
 
   CoInitializeEx(NULL, COINIT_MULTITHREADED);
   if (!ensure_enumerator()) {
-    trace_log("[error] failed to create device enumerator\n");
-    return false;
+    return AE_FAIL("failed to create device enumerator");
   }
 
   g_capture_ctx.device =
       open_device_by_id(str16_from_8(cap_arena, capture_device_id));
   if (!g_capture_ctx.device) {
-    trace_log("[error] could not open capture device\n");
-    return false;
+    return AE_FAIL("could not open capture device");
   }
 
   HRESULT hr =
       IMMDevice_Activate(g_capture_ctx.device, &IID_IAudioClient, CLSCTX_ALL,
                          NULL, (void **)&g_capture_ctx.client);
   if (FAILED(hr)) {
-    trace_log("[error] activate(capture) failed: 0x%08lx\n", hr);
-    ae_stop();
-    return false;
+    return AE_FAIL("activate(capture) failed: 0x%08lx", hr);
   }
 
   IAudioClient_GetMixFormat(g_capture_ctx.client, &g_capture_ctx.format);
   if (!is_float_format(g_capture_ctx.format)) {
-    trace_log("[error] capture device mix format is not float32\n");
-    ae_stop();
-    return false;
+    return AE_FAIL("capture device mix format is not float32\n");
   }
 
   hr = IAudioClient_Initialize(g_capture_ctx.client, AUDCLNT_SHAREMODE_SHARED,
@@ -433,9 +435,7 @@ bool ae_start(Arena *cap_arena, Arena *outputs_arena, Str8 capture_device_id,
                                AE_BUFFER_TIME_MS * 10000, // in 100ns units
                                0, g_capture_ctx.format, NULL);
   if (FAILED(hr)) {
-    trace_log("[error] initialize(capture) failed: 0x%07lx", hr);
-    ae_stop();
-    return false;
+    return AE_FAIL("initialize(capture) failed: 0x%07lx", hr);
   }
 
   g_capture_ctx.event = CreateEventW(NULL, FALSE, FALSE, NULL);
@@ -467,6 +467,7 @@ bool ae_start(Arena *cap_arena, Arena *outputs_arena, Str8 capture_device_id,
         oc->client, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
         AE_BUFFER_TIME_MS * 10000, 0, oc->format, NULL);
     if (FAILED(hr)) {
+      trace_log("[warning] output %u init failed: 0x%08lx\n", i, hr);
       free_output(oc);
       continue;
     }
@@ -482,21 +483,13 @@ bool ae_start(Arena *cap_arena, Arena *outputs_arena, Str8 capture_device_id,
   }
 
   if (g_output_count == 0) {
-    trace_log("[error] no output devices could be opened\n");
-    ae_stop();
-    arena_pop_to(cap_arena, 0);
-    arena_pop_to(outputs_arena, 0);
-    return false;
+    return AE_FAIL("no output devices could be opened");
   }
 
   atomic_store(&g_capture_ctx.stop_flag, false);
   if (thrd_create(&g_capture_ctx.thread, capture_thread_proc, NULL) !=
       thrd_success) {
-    trace_log("[error] could not create capture thread\n");
-    ae_stop();
-    arena_pop_to(cap_arena, 0);
-    arena_pop_to(outputs_arena, 0);
-    return false;
+    return AE_FAIL("could not create capture thread");
   }
   g_capture_ctx.thread_valid = true;
 

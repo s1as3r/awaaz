@@ -9,6 +9,17 @@
 #define AE_BUFFER_TIME_MS 10
 #define AE_WAIT_TIMEOUT_MS (AE_BUFFER_TIME_MS * 3)
 
+#define AE_ERR_SZ 256
+global char g_ae_error[AE_ERR_SZ];
+
+#define ae_set_error(...)                                                      \
+  (snprintf(g_ae_error, AE_ERR_SZ, __VA_ARGS__),                               \
+   trace_log("[error] %s\n", g_ae_error))
+
+static inline const char *ae_last_error(void) {
+  return g_ae_error;
+}
+
 typedef struct {
   Str8 id;   // endpoint id string used to open the device.
   Str8 name; // human friendly name shown in the ui.

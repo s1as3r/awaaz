@@ -143,8 +143,11 @@ void draw_ui(AppState *state) {
                    "select at least one output device");
         } else {
           state->err[0] = 0;
-          ae_start(state->capture_arena, state->outputs_arena,
-                   state->devices.devices[state->capture_idx].id, out_ids, n);
+          if (!ae_start(state->capture_arena, state->outputs_arena,
+                        state->devices.devices[state->capture_idx].id, out_ids,
+                        n)) {
+            snprintf(state->err, AE_MAX_ERR_SZ, "%s", ae_last_error());
+          }
         }
       }
     }
@@ -195,6 +198,7 @@ int main(void) {
 
   SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
   SDL_ShowWindow(window);
+  SDL_SetRenderVSync(renderer, 1);
 
   igCreateContext(NULL);
   ImGuiIO *io = igGetIO_Nil();
@@ -251,6 +255,10 @@ int main(void) {
     ImDrawData *draw_data = igGetDrawData();
     ImGui_ImplSDLRenderer3_RenderDrawData(draw_data, renderer);
     SDL_RenderPresent(renderer);
+  }
+
+  if (ae_is_running()) {
+    ae_stop();
   }
 
   ImGui_ImplSDL3_Shutdown();

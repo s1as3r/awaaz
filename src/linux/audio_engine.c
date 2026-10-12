@@ -225,11 +225,7 @@ internal void free_capture(CaptureCtx *cc) {
   memset(cc, 0, sizeof(*cc));
 }
 
-void ae_stop(void) {
-  if (!atomic_load(&g_running)) {
-    return;
-  }
-
+internal void ae_teardown(void) {
   atomic_store(&g_capture_ctx.stop_flag, true);
   for (u32 i = 0; i < g_output_count; i += 1) {
     atomic_store(&g_outputs[i].stop_flag, true);
@@ -249,20 +245,31 @@ void ae_stop(void) {
   }
 
   g_output_count = 0;
+  g_outputs = NULL;
+
   free_capture(&g_capture_ctx);
   atomic_store(&g_running, false);
+}
+
+void ae_stop(void) {
+  if (atomic_load(&g_running))
+    ae_teardown();
 }
 
 bool ae_is_running(void) {
   return atomic_load(&g_running);
 }
 
+#define AE_FAIL(...)                                                           \
+  (ae_set_error(__VA_ARGS__), ae_teardown(), arena_pop_to(cap_arena, 0),       \
+   arena_pop_to(outputs_arena, 0), false)
+
 bool ae_start(Arena *cap_arena, Arena *outputs_arena, Str8 capture_device_id,
               const Str8 *output_ids, u32 output_count) {
+  g_ae_error[0] = 0;
   if (ae_is_running()) {
-    ae_stop();
-    arena_pop_to(cap_arena, 0);
-    arena_pop_to(outputs_arena, 0);
+    ae_set_error("already running");
+    return false;
   }
 
   pa_sample_spec ss = {.format = PA_SAMPLE_FLOAT32LE,
@@ -291,8 +298,7 @@ bool ae_start(Arena *cap_arena, Arena *outputs_arena, Str8 capture_device_id,
   g_capture_ctx.pa = pa_simple_new(NULL, "awaaz", PA_STREAM_RECORD, monitor_id,
                                    "capture", &ss, NULL, &attr, &err);
   if (!g_capture_ctx.pa) {
-    trace_log("[error] initialize(capture) failed: %s\n", pa_strerror(err));
-    return false;
+    return AE_FAIL("initialize(capture) failed: %s", pa_strerror(err));
   }
 
   g_outputs = push_array_no_zero(outputs_arena, OutputCtx, output_count);
@@ -321,21 +327,13 @@ bool ae_start(Arena *cap_arena, Arena *outputs_arena, Str8 capture_device_id,
   }
 
   if (g_output_count == 0) {
-    trace_log("[error] no output devices could be opened\n");
-    ae_stop();
-    arena_pop_to(cap_arena, 0);
-    arena_pop_to(outputs_arena, 0);
-    return false;
+    return AE_FAIL("no output devices could be opened");
   }
 
   atomic_store(&g_capture_ctx.stop_flag, false);
   if (thrd_create(&g_capture_ctx.thread, capture_thread_proc, NULL) !=
       thrd_success) {
-    trace_log("[error] could not create capture thread\n");
-    ae_stop();
-    arena_pop_to(cap_arena, 0);
-    arena_pop_to(outputs_arena, 0);
-    return false;
+    return AE_FAIL("could not create capture thread");
   }
   g_capture_ctx.thread_valid = true;
 
