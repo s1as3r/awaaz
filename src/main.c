@@ -44,9 +44,7 @@ typedef struct {
 void refresh_devices(AppState *state) {
   arena_pop_to(state->ui_arena, 0);
   state->devices = ae_enumerate_render_devices(state->ui_arena);
-  if (state->capture_idx >= (i32)state->devices.count) {
-    state->capture_idx = -1;
-  }
+  state->capture_idx = -1;
 
   state->selected_outputs =
       push_array_no_zero(state->ui_arena, bool, state->devices.count);
@@ -73,6 +71,9 @@ void draw_ui(AppState *state) {
   igText("audio output to multiple devices");
   igSeparator();
 
+  bool running = ae_is_running();
+
+  igBeginDisabled(running);
   if (igButton("Refresh Devices", g_zero_vec2)) {
     refresh_devices(state);
   }
@@ -90,6 +91,7 @@ void draw_ui(AppState *state) {
       if (igSelectable_Bool((char *)state->devices.devices[i].name.str,
                             selected, 0, g_zero_vec2)) {
         state->capture_idx = i;
+        state->selected_outputs[i] = false;
       }
       if (selected) {
         igSetItemDefaultFocus();
@@ -119,8 +121,8 @@ void draw_ui(AppState *state) {
 
   igSpacing();
   igSeparator();
+  igEndDisabled();
 
-  bool running = ae_is_running();
   if (!running) {
     if (igButton("Start", g_zero_vec2)) {
       if (state->capture_idx < 0) {
