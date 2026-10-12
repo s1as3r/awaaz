@@ -177,6 +177,7 @@ internal void convert_channels(const f32 *in, u32 n_in_ch, f32 *out,
 }
 
 internal int output_thread_proc(void *param) {
+  SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
   OutputCtx *oc = (OutputCtx *)param;
   CoInitializeEx(NULL, COINIT_MULTITHREADED);
 
@@ -253,13 +254,15 @@ internal int output_thread_proc(void *param) {
 // WASAPI capture on the input device, fans each block out to evey active
 // output's ring buffer
 internal int capture_thread_proc(void *param) {
+  SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
   (void)param;
   CoInitializeEx(NULL, COINIT_MULTITHREADED);
 
   IAudioClient_Start(g_capture_ctx.client);
 
   while (!atomic_load(&g_capture_ctx.stop_flag)) {
-    if (WaitForSingleObject(g_capture_ctx.event, AE_WAIT_TIMEOUT_MS) != WAIT_OBJECT_0) {
+    if (WaitForSingleObject(g_capture_ctx.event, AE_WAIT_TIMEOUT_MS) !=
+        WAIT_OBJECT_0) {
       continue;
     }
 
