@@ -1,14 +1,16 @@
 # awaaz - output audio to multiple devices
 
-- [x] gui
-- [ ] perf
-- [x] linux?
+![screenshot](./assets/screenshot.png)
 
 ## Build
 - Clone the repo (with submodules):
     - `git clone https://github.com/s1as3r/awaaz.git --recurse-submodules`
 - Build
-    - assumnes msvc is available - might want to use the developer powershell for this
-    - `./build.ps1`
+    - Windows
+        - assumnes msvc is available - might want to use the developer powershell for this
+        - `./build.ps1`
+    - Linux
+        - assumes clang is available
+        - `./build.sh`
 - Run
-    - the app will be at `./build/awaaz.exe`
+    - the app will be at `./build/awaaz.exe` | `./build/awaaz`
