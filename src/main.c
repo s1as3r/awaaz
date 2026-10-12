@@ -87,6 +87,7 @@ void draw_ui(AppState *state) {
 
   if (igBeginCombo("##capture", preview, ImGuiComboFlags_None)) {
     for (i32 i = 0; i < (i32)state->devices.count; i += 1) {
+      igPushID_Int(i);
       bool selected = (i == state->capture_idx);
       if (igSelectable_Bool((char *)state->devices.devices[i].name.str,
                             selected, 0, g_zero_vec2)) {
@@ -96,6 +97,7 @@ void draw_ui(AppState *state) {
       if (selected) {
         igSetItemDefaultFocus();
       }
+      igPopID();
     }
     igEndCombo();
   }
