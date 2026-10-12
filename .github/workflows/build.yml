@@ -34,7 +34,7 @@ jobs:
 
     - name: Generate Artifacts
       run: |
-        ls build/
+        ls -R -Depth 1 build/
         cp build/awaaz.exe ${{ env.PROJECT_RELEASE_PATH }}/awaaz.exe
         ls ${{ env.PROJECT_RELEASE_PATH }}/
 
