@@ -3,7 +3,6 @@
 #include <pulse/pulseaudio.h>
 #include <stdatomic.h>
 #include <string.h>
-#include <math.h>
 
 #include <bace/bace.h>
 
@@ -184,9 +183,6 @@ internal void capture_read_cb(pa_stream *s, size_t nbytes, void *ud) {
     }
 
     if (data) {
-      const f32 *f = (const f32 *)data;
-      u32 nframes = (u32)(len / AE_FRAME_BYTES);
-
       for (u32 o = 0; o < g_output_count; o += 1) {
         pa_stream *out = g_outputs[o].stream;
 
