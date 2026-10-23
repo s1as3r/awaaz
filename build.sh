@@ -57,7 +57,7 @@ LIBS=(
   "-L$BUILD_PATH/sdl/"
   "$BUILD_PATH/cimgui/cimgui/cimgui.a"
   "$BACE_OBJ"
-  -lSDL3 -lm -lpthread -lstdc++ -lpulse -lpulse-simple
+  -lSDL3 -lm -lpthread -lstdc++ -lpulse
 )
 
 COMP_FLAGS=(

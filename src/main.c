@@ -17,7 +17,6 @@
 #elif OS_LINUX
 #include "linux/audio_engine.c"
 #endif
-#include "ring_buffer.c"
 
 #define AE_MAX_ERR_SZ 256
 
@@ -157,13 +156,6 @@ void draw_ui(AppState *state) {
       arena_pop_to(state->capture_arena, 0);
       arena_pop_to(state->outputs_arena, 0);
     }
-  }
-
-  if (running) {
-    igSpacing();
-    igText("Level: ");
-    igSameLine(0, 0);
-    igProgressBar(ae_peak_level(), (ImVec2){-1.0f, 0.0f}, NULL);
   }
 
   if (state->err[0]) {

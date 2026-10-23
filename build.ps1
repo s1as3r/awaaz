@@ -27,7 +27,7 @@ $Libs = @(
     $BaceObj, $UuidObj
     "SDL3-static.lib", "cimgui.lib"
     "ole32.lib", "ksuser.lib", "winmm.lib", "advapi32.lib"
-    "gdi32.lib", "version.lib", "oleaut32.lib"
+    "gdi32.lib", "version.lib", "oleaut32.lib", "avrt.lib"
 )
 
 $CompFlags = @(
