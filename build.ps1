@@ -76,11 +76,14 @@ function Build-Bace {
     Write-Host "== building bace =="
     Push-Location $BacePath
     $oldBPath = $env:BUILD_PATH
+    $oldBType = $env:BUILD_TYPE
     $env:BUILD_PATH = $BuildPath
+    $env:BUILD_TYPE = $Config
     try {
         Invoke-Native { & "./build.ps1" }
     } finally {
         $env:BUILD_PATH = $oldBPath
+        $env:BUILD_TYPE = $oldBType
         Pop-Location
     }
 }

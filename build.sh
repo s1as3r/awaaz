@@ -40,7 +40,7 @@ build_cimgui() {
 
 build_bace() {
   echo "== building bace =="
-  (cd "$BACE_PATH" && BUILD_PATH="$BUILD_PATH" ./build.sh)
+  (cd "$BACE_PATH" && BUILD_PATH="$BUILD_PATH" BUILD_TYPE="$BUILD_TYPE" ./build.sh)
 }
 
 if [[ $BUILD_TYPE == "Release" ]]; then
